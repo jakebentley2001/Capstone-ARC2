@@ -6,6 +6,8 @@
 #SBATCH --ntasks=1         # Run a single task
 #SBATCH --cpus-per-task=4  # Request 8 CPU cores per task (adjust as needed)
 #SBATCH --mem=16G 
+#SBATCH --partition=GPU
+
 
 #Load conda
 module load anaconda3
