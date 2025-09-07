@@ -2,7 +2,7 @@
 #SBATCH -J setup_env
 #SBATCH -p gpu
 #SBATCH -N 1
-#SBATCH --gres=gpu:1
+#SBATCH --gres=gpu:A100_40GB:1
 #SBATCH -t 01:00:00
 #SBATCH -o logs/setup-%j.out
 #SBATCH -e logs/setup-%j.err
