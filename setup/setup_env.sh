@@ -1,14 +1,11 @@
 #!/bin/bash
-#SBATCH --job-name=setup_env
-#SBATCH --output=logs/%x_%j.out
-#SBATCH --error=logs/%x_%j.err
-#SBATCH --time=24:00:00
-#SBATCH --nodes=1
-#SBATCH --ntasks=1
-#SBATCH --cpus-per-task=4
-#SBATCH --mem=32G
-#SBATCH --gres=gpu:A100_40GB:1
-#SBATCH --partition=general
+#SBATCH -p setup_env
+#SBATCH -A cis250063p
+#SBATCH --gpus=A100-40:1     # Request 1 GPU (adjust as needed)
+#SBATCH --time=1:00:00     # Request 3 hours of runtime (adjust as needed)
+#SBATCH --ntasks=1         # Run a single task
+#SBATCH --cpus-per-task=4  # Request 8 CPU cores per task (adjust as needed)
+#SBATCH --mem=16G 
 
 #Load conda
 module load anaconda3
