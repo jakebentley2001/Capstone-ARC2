@@ -1,12 +1,14 @@
 #!/bin/bash
-#SBATCH -p setup_env
-#SBATCH -A cis250063p
-#SBATCH --gpus=A100-40:1     # Request 1 GPU (adjust as needed)
-#SBATCH --time=1:00:00     # Request 3 hours of runtime (adjust as needed)
-#SBATCH --ntasks=1         # Run a single task
-#SBATCH --cpus-per-task=4  # Request 8 CPU cores per task (adjust as needed)
-#SBATCH --mem=16G 
-#SBATCH --partition=GPU
+#SBATCH --job-name=setup_env
+#SBATCH --account=cis250063p     # your allocation
+#SBATCH --partition=GPU-shared   # shared GPU partition for < full node
+#SBATCH --gres=gpu:1             # generic 1 GPU (no type pinning)
+#SBATCH --time=01:00:00
+#SBATCH --ntasks=1
+#SBATCH --cpus-per-task=4
+#SBATCH --mem=16G
+#SBATCH --output=logs/%x_%j.out
+#SBATCH --error=logs/%x_%j.err
 
 
 #Load conda
