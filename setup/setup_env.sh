@@ -1,11 +1,13 @@
 #!/bin/bash
-#SBATCH -J setup_env
-#SBATCH -p gpu
-#SBATCH -N 1
-#SBATCH --gres=gpu:A100_40GB:1
-#SBATCH -t 01:00:00
-#SBATCH -o logs/setup-%j.out
-#SBATCH -e logs/setup-%j.err
+#SBATCH --job-name=upload_model
+#SBATCH --output=./logs/upload_model_%j.out
+#SBATCH --error=./logs/upload_model_%j.err
+#SBATCH --time=01:00:00
+#SBATCH --nodes=1
+#SBATCH --ntasks=1
+#SBATCH --cpus-per-task=2
+#SBATCH --mem=8G
+#SBATCH --partition=general
 
 #Load conda
 module load anaconda3
