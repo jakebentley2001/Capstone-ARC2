@@ -1,1 +1,4 @@
 venv/
+re-arc/
+shared/arc/data/
+setup/
