@@ -39,14 +39,14 @@ export TOKENIZERS_PARALLELISM=false
 #export PYTORCH_CUDA_ALLOC_CONF=max_split_size_mb:512
 export PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
 
-# Load your site’s CUDA module (example names; use what `module avail` shows)
-# module avail cuda
-# module load cuda/12.6.1
+#Load your site’s CUDA module (example names; use what `module avail` shows)
+module avail cuda
+module load cuda/12.6.1
 
-# Make sure CUDA_HOME is set (modules usually do this, but be explicit if needed)
-# export CUDA_HOME=${CUDA_HOME:-/usr/local/cuda-12.6.1}
-# export PATH="$CUDA_HOME/bin:$PATH"
-# export LD_LIBRARY_PATH="$CUDA_HOME/lib64:$LD_LIBRARY_PATH"
+#Make sure CUDA_HOME is set (modules usually do this, but be explicit if needed)
+export CUDA_HOME=${CUDA_HOME:-/usr/local/cuda-12.6.1}
+export PATH="$CUDA_HOME/bin:$PATH"
+export LD_LIBRARY_PATH="$CUDA_HOME/lib64:$LD_LIBRARY_PATH"
 
 # # --- Torchrun (single node, 4 GPUs) ---
 # MASTER_PORT=${MASTER_PORT:-29501}
