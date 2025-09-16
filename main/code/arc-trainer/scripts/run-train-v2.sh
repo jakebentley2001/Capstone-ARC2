@@ -7,7 +7,7 @@
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=8
 #SBATCH --mem=32G
-#SBATCH --gres=gpu:h100-80:3  # Request 3 GPUs
+#SBATCH --gres=gpu:v100-32GB  # Request 3 GPUs
 #SBATCH -p GPU-shared
 #SBATCH -A cis250063p
 
