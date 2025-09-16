@@ -715,13 +715,15 @@ def load_model_and_tokenizer(model_name):
         bnb_4bit_compute_dtype=torch.bfloat16 if torch.cuda.is_bf16_supported() else torch.float16,
         bnb_4bit_use_double_quant=True
     )
+    local_rank = int(os.environ.get("LOCAL_RANK", 0))     # set by torchrun
+    torch.cuda.set_device(local_rank)
     
     # Load the model with quantization config
     model = AutoModelForCausalLM.from_pretrained(
         model_name,
         quantization_config=quantization_config,
         torch_dtype=torch.bfloat16 if torch.cuda.is_bf16_supported() else torch.float16
-        # device_map="auto"
+        device_map={"": local_rank},
     )
     
     # Prepare model for training with 4-bit quantization
@@ -740,7 +742,7 @@ def merge_lora_weights(base_model_path, adapter_path, output_path):
     model = AutoModelForCausalLM.from_pretrained(
         base_model_path,
         torch_dtype=torch.bfloat16 if torch.cuda.is_bf16_supported() else torch.float16
-        # device_map="auto"
+        device_map={"": local_rank},
     )
 
     logger.info("Re-applying embedding size reduction for merging")
