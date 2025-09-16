@@ -40,18 +40,19 @@ export TOKENIZERS_PARALLELISM=false
 export PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
 
 # Load your site’s CUDA module (example names; use what `module avail` shows)
-module avail cuda
-module load cuda/12.6.1
+# module avail cuda
+# module load cuda/12.6.1
 
 # Make sure CUDA_HOME is set (modules usually do this, but be explicit if needed)
-export CUDA_HOME=${CUDA_HOME:-/usr/local/cuda-12.6.1}
-export PATH="$CUDA_HOME/bin:$PATH"
-export LD_LIBRARY_PATH="$CUDA_HOME/lib64:$LD_LIBRARY_PATH"
+# export CUDA_HOME=${CUDA_HOME:-/usr/local/cuda-12.6.1}
+# export PATH="$CUDA_HOME/bin:$PATH"
+# export LD_LIBRARY_PATH="$CUDA_HOME/lib64:$LD_LIBRARY_PATH"
 
-# --- Torchrun (single node, 4 GPUs) ---
-MASTER_PORT=${MASTER_PORT:-29501}
-echo "Starting torchrun on $(hostname) with 3 GPUs..."
-torchrun \
-  --nproc_per_node=3 \
-  --master_port=$MASTER_PORT \
-  main/code/arc-trainer/train_v1.py
+# # --- Torchrun (single node, 4 GPUs) ---
+# MASTER_PORT=${MASTER_PORT:-29501}
+# echo "Starting torchrun on $(hostname) with 3 GPUs..."
+# torchrun \
+#   --nproc_per_node=3 \
+#   --master_port=$MASTER_PORT \
+#   main/code/arc-trainer/train_v1.py
+deepspeed --num_gpus=3 main/code/arc-trainer/train_v1.py
