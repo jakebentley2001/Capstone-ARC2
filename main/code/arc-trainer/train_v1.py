@@ -601,10 +601,10 @@ import logging
 
 os.environ["HF_HOME"] = "/ocean/projects/cis250063p/jbentley/ARC-AGI-2/Capstone-ARC2/shared/arc/cache/hf"
 os.environ["TRANSFORMERS_CACHE"] = "/ocean/projects/cis250063p/jbentley/ARC-AGI-2/Capstone-ARC2/shared/arc/cache/hf"
-os.environ["HF_DATASETS_CACHE"] = "/shared/arc/cache/ds"
+os.environ["HF_DATASETS_CACHE"] = "/ocean/projects/cis250063p/jbentley/ARC-AGI-2/Capstone-ARC2/shared/arc/cache/ds"
 
 # Figure out where to put logs
-output_root = os.environ.get("ARC_OUTPUT_ROOT", ".")
+output_root = "/ocean/projects/cis250063p/jbentley/ARC-AGI-2/Capstone-ARC2/shared/arc/outputs"
 log_dir = os.path.join(output_root, "logs")
 os.makedirs(log_dir, exist_ok=True)
 
@@ -625,7 +625,7 @@ logger = logging.getLogger(__name__)
 
 logger.info(f"Logging to {log_file}")
 
-base_path = '/kaggle/input/full-arc-data/ARC-Data/input'
+base_path = '/ocean/projects/cis250063p/jbentley/ARC-AGI-2/Capstone-ARC2/shared/arc/data/ARC-Data/input'
 # input paths
 base_model = 'chuanli11/Llama-3.2-3B-Instruct-uncensored'  # auto-downloaded from huggingface.co
 arc_data_path = os.path.join(base_path, 'arc-prize-2024')  # as on kaggle arc prize 2024
@@ -633,7 +633,10 @@ re_arc_path = os.path.join(base_path, 're_arc')  # https://github.com/michaelhod
 neoneye_path = os.path.join(base_path, 'arc-dataset-collection')  # https://github.com/neoneye/arc-dataset-collection)
 
 # output paths
-save_model_path = os.path.join('pretrained_models', "Llama-3")
+base_model_path = "/ocean/projects/cis250063p/jbentley/ARC-AGI-2/Capstone-ARC2/shared/arc/outputs/models"
+save_model_path = os.path.join(base_model_path, "Llama-3")
+
+
 
 def download_model(model_name):
     """Pre-download the model to ensure it's available before training starts"""
@@ -754,8 +757,7 @@ def merge_lora_weights(base_model_path, adapter_path, output_path):
 def create_output_dirs():
     """Create necessary output directories"""
     dirs = [
-        'tmp_output',
-        'offload',
+        '/ocean/projects/cis250063p/jbentley/ARC-AGI-2/Capstone-ARC2/shared/arc/outputs/runs/tmp_output',  # trainer output_dir
         os.path.dirname(save_model_path)
     ]
     
@@ -911,7 +913,7 @@ def main():
             # run training with DeepSpeed
             tokenizer.padding_side = 'right'
             training_args = TrainingArguments(
-                output_dir='tmp_output',
+                output_dir='/ocean/projects/cis250063p/jbentley/ARC-AGI-2/Capstone-ARC2/shared/arc/outputs/runs/tmp_output',
                 num_train_epochs=1,
                 per_device_train_batch_size=1,  # Increased to match DeepSpeed config
                 gradient_accumulation_steps=8,  # No need for gradient accumulation
@@ -926,6 +928,7 @@ def main():
                 seed=42,
                 deepspeed=deepspeed_config,
                 remove_unused_columns=False,
+
             )
             
             logger.info("Starting training with DeepSpeed")
