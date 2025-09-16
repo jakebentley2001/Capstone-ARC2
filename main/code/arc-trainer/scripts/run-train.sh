@@ -7,7 +7,7 @@
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=8
 #SBATCH --mem=32G
-#SBATCH --gres=gpu:h100-80:2  # Request 4 GPUs
+#SBATCH --gres=gpu:h100-80:3  # Request 3 GPUs
 #SBATCH -p GPU-shared
 #SBATCH -A cis250063p
 
@@ -50,8 +50,8 @@ export LD_LIBRARY_PATH="$CUDA_HOME/lib64:$LD_LIBRARY_PATH"
 
 # --- Torchrun (single node, 4 GPUs) ---
 MASTER_PORT=${MASTER_PORT:-29501}
-echo "Starting torchrun on $(hostname) with 4 GPUs..."
+echo "Starting torchrun on $(hostname) with 3 GPUs..."
 torchrun \
-  --nproc_per_node=4 \
+  --nproc_per_node=3 \
   --master_port=$MASTER_PORT \
   main/code/arc-trainer/train_v1.py
