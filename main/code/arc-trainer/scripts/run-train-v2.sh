@@ -7,7 +7,7 @@
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=8
 #SBATCH --mem=32G
-#SBATCH --gres=gpu:h100-80:3  # Request 3 GPUs
+#SBATCH --gres=gpu:h100-80:2  # Request 3 GPUs
 #SBATCH -p GPU-shared
 #SBATCH -A cis250063p
 
@@ -39,10 +39,19 @@ export TOKENIZERS_PARALLELISM=false
 #export PYTORCH_CUDA_ALLOC_CONF=max_split_size_mb:512
 export PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
 
+# Load your site’s CUDA module (example names; use what `module avail` shows)
+module avail cuda
+module load cuda/12.6.1
+
+#Make sure CUDA_HOME is set (modules usually do this, but be explicit if needed)
+export CUDA_HOME=${CUDA_HOME:-/usr/local/cuda-12.6.1}
+export PATH="$CUDA_HOME/bin:$PATH"
+export LD_LIBRARY_PATH="$CUDA_HOME/lib64:$LD_LIBRARY_PATH"
+
 # # --- Torchrun (single node, 4 GPUs) ---
 MASTER_PORT=${MASTER_PORT:-29501}
 echo "Starting torchrun on $(hostname) with 3 GPUs..."
 torchrun \
-  --nproc_per_node=3 \
+  --nproc_per_node=2 \
   --master_port=$MASTER_PORT \
   main/code/arc-trainer/train_v2.py
