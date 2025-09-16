@@ -598,6 +598,11 @@ from datasets import Dataset
 from datetime import datetime
 
 import logging
+
+os.environ["HF_HOME"] = "/ocean/projects/cis250063p/jbentley/ARC-AGI-2/Capstone-ARC2/shared/arc/cache/hf"
+os.environ["TRANSFORMERS_CACHE"] = "/ocean/projects/cis250063p/jbentley/ARC-AGI-2/Capstone-ARC2/shared/arc/cache/hf"
+os.environ["HF_DATASETS_CACHE"] = "/shared/arc/cache/ds"
+
 # Figure out where to put logs
 output_root = os.environ.get("ARC_OUTPUT_ROOT", ".")
 log_dir = os.path.join(output_root, "logs")
