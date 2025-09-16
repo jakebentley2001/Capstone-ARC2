@@ -1,57 +1,58 @@
 #!/bin/bash
 #SBATCH --job-name=arc_train
-#SBATCH --output=/ocean/projects/cis250063p/jbentley/ARC-AGI-2/Capstone-ARC2/shared/arc/outputs/logs/%x_%j.out
-#SBATCH --error=/ocean/projects/cis250063p/jbentley/ARC-AGI-2/Capstone-ARC2/shared/arc/outputs/logs/%x_%j.err
-#SBATCH --time=6:00:00
+#SBATCH --partition=GPU-shared
+#SBATCH --account=cis250063p
 #SBATCH --nodes=1
 #SBATCH --ntasks=1
+#SBATCH --gres=gpu:h100-80:2
 #SBATCH --cpus-per-task=8
 #SBATCH --mem=32G
-#SBATCH --gres=gpu:h100-80:2  # Request 3 GPUs
-#SBATCH -p GPU-shared
-#SBATCH -A cis250063p
+#SBATCH --time=12:00:00
+#SBATCH --output=/ocean/projects/cis250063p/jbentley/ARC-AGI-2/Capstone-ARC2/shared/arc/outputs/logs/%x_%j.out
+#SBATCH --error=/ocean/projects/cis250063p/jbentley/ARC-AGI-2/Capstone-ARC2/shared/arc/outputs/logs/%x_%j.err
 
-
-
-
-# --- Setup paths ---
+# --- Paths ---
 PROJECT_ROOT=/ocean/projects/cis250063p/jbentley/ARC-AGI-2/Capstone-ARC2
 OUTPUT_ROOT=$PROJECT_ROOT/shared/arc/outputs
 CACHE_ROOT=$PROJECT_ROOT/shared/arc/cache
-
 mkdir -p "$OUTPUT_ROOT/logs" "$OUTPUT_ROOT/runs" "$CACHE_ROOT/hf" "$CACHE_ROOT/ds"
-
 cd "$PROJECT_ROOT" || exit 1
 
 # --- Conda env ---
-eval "$(conda shell.bash hook)"
+eval "$($HOME/miniconda3/bin/conda shell.bash hook)"
 conda activate arc-env
 
-# --- Caches (Hugging Face) ---
+# --- Hugging Face caches (no deprecated TRANSFORMERS_CACHE) ---
 export HF_HOME="$CACHE_ROOT/hf"
-export TRANSFORMERS_CACHE="$CACHE_ROOT/hf"
 export HF_DATASETS_CACHE="$CACHE_ROOT/ds"
+export HUGGINGFACE_HUB_CACHE="$HF_HOME"
 
-
-# Set environment variables for better stability
-export CUDA_LAUNCH_BLOCKING=1
+# --- Runtime sanity & stability ---
 export TOKENIZERS_PARALLELISM=false
-#export PYTORCH_CUDA_ALLOC_CONF=max_split_size_mb:512
 export PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
+export OMP_NUM_THREADS=$(( SLURM_CPUS_PER_TASK>2 ? SLURM_CPUS_PER_TASK-2 : 1 ))
+export NCCL_DEBUG=WARN
+export TORCH_NCCL_BLOCKING_WAIT=1
 
-# Load your site’s CUDA module (example names; use what `module avail` shows)
-module avail cuda
-module load cuda/12.6.1
+# If deepspeed is installed, keep it inert so it doesn't try to compile CUDA ops
+export DS_BUILD_OPS=0
+export DS_SKIP_CUDA_CHECK=1
+export DS_BUILD_AIO=0
 
-#Make sure CUDA_HOME is set (modules usually do this, but be explicit if needed)
-export CUDA_HOME=${CUDA_HOME:-/usr/local/cuda-12.6.1}
-export PATH="$CUDA_HOME/bin:$PATH"
-export LD_LIBRARY_PATH="$CUDA_HOME/lib64:$LD_LIBRARY_PATH"
+# --- Info dump (handy for debugging) ---
+echo "Host: $(hostname)"
+nvidia-smi || true
+python - <<'PY'
+import torch, os
+print("cuda_available:", torch.cuda.is_available(), "num_gpus:", torch.cuda.device_count())
+print("LOCAL_RANK:", os.environ.get("LOCAL_RANK"), "RANK:", os.environ.get("RANK"), "WORLD_SIZE:", os.environ.get("WORLD_SIZE"))
+PY
 
-# # --- Torchrun (single node, 4 GPUs) ---
+# --- Launch training with DDP (ranks = GPUs on node) ---
 MASTER_PORT=${MASTER_PORT:-29501}
-echo "Starting torchrun on $(hostname) with 3 GPUs..."
+NPROC=${SLURM_GPUS_ON_NODE:-${SLURM_GPUS:-2}}
+echo "Launching torchrun with ${NPROC} ranks on $(hostname)"
 torchrun \
-  --nproc_per_node=2 \
-  --master_port=$MASTER_PORT \
+  --nproc_per_node="${NPROC}" \
+  --master_port="${MASTER_PORT}" \
   main/code/arc-trainer/train_v2.py
