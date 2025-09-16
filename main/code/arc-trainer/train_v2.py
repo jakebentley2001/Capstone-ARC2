@@ -741,7 +741,7 @@ def merge_lora_weights(base_model_path, adapter_path, output_path):
     tokenizer = AutoTokenizer.from_pretrained(base_model_path)
     model = AutoModelForCausalLM.from_pretrained(
         base_model_path,
-        torch_dtype=torch.bfloat16 if torch.cuda.is_bf16_supported() else torch.float16
+        torch_dtype=torch.bfloat16 if torch.cuda.is_bf16_supported() else torch.float16,
         device_map={"": local_rank},
     )
 
