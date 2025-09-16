@@ -636,7 +636,10 @@ neoneye_path = os.path.join(base_path, 'arc-dataset-collection')  # https://gith
 base_model_path = "/ocean/projects/cis250063p/jbentley/ARC-AGI-2/Capstone-ARC2/shared/arc/outputs/models"
 save_model_path = os.path.join(base_model_path, "Llama-3")
 
-
+import torch.distributed as dist, os
+rank = int(os.environ.get("RANK", -1))
+world = int(os.environ.get("WORLD_SIZE", 1))
+logger.info(f"RANK={rank} WORLD_SIZE={world} DIST_INIT={dist.is_available() and dist.is_initialized()}")
 
 def download_model(model_name):
     """Pre-download the model to ensure it's available before training starts"""
