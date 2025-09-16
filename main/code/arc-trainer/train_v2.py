@@ -888,6 +888,9 @@ def main():
                 report_to='none',
                 seed=42,
                 remove_unused_columns=False,
+                gradient_checkpointing=True,
+                gradient_checkpointing_kwargs={"use_reentrant": False},
+                ddp_find_unused_parameters=False,
 
             )
             
