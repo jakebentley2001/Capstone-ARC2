@@ -24,7 +24,7 @@ mkdir -p "$OUTPUT_ROOT/logs" "$OUTPUT_ROOT/runs" "$CACHE_ROOT/hf" "$CACHE_ROOT/d
 cd "$PROJECT_ROOT" || exit 1
 
 # --- Conda env ---
-source ~/miniconda3/etc/profile.d/conda.sh
+eval "$(conda shell.bash hook)"
 conda activate arc-env
 
 # --- Caches (Hugging Face) ---
