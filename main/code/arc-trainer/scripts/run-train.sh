@@ -2,13 +2,17 @@
 #SBATCH --job-name=arc_train
 #SBATCH --output=/ocean/projects/cis250063p/jbentley/ARC-AGI-2/Capstone-ARC2/shared/arc/outputs/logs/%x_%j.out
 #SBATCH --error=/ocean/projects/cis250063p/jbentley/ARC-AGI-2/Capstone-ARC2/shared/arc/outputs/logs/%x_%j.err
-#SBATCH --time=24:00:00
+#SBATCH --time=6:00:00
 #SBATCH --nodes=1
 #SBATCH --ntasks=1
-#SBATCH --cpus-per-task=16
+#SBATCH --cpus-per-task=8
 #SBATCH --mem=32G
-#SBATCH --gres=gpu:H100_40GB:4  # Request 4 GPUs
-#SBATCH --partition=general
+#SBATCH --gres=gpu:h100-80:2  # Request 4 GPUs
+#SBATCH -p GPU-shared
+#SBATCH -A cis250063p
+
+
+
 
 # --- Setup paths ---
 PROJECT_ROOT=/ocean/projects/cis250063p/jbentley/ARC-AGI-2/Capstone-ARC2
