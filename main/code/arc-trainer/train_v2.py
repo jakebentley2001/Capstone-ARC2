@@ -732,18 +732,43 @@ def load_model_and_tokenizer(model_name):
     
     return model, tokenizer
 
+def _get_local_rank():
+    # works with torchrun/DDP and also in single-proc runs
+    try:
+        return int(os.environ.get("LOCAL_RANK", "0"))
+    except ValueError:
+        return 0
+
+def _is_main_process():
+    return int(os.environ.get("RANK", "0")) in (-1, 0)
+
+
 def merge_lora_weights(base_model_path, adapter_path, output_path):
     """Merge LoRA weights into the base model and save"""
     logger.info(f"Merging LoRA weights from {adapter_path} into base model")
     start_time = time.time()
+
+    if not _is_main_process():
+        logger.info("Skipping merge on non-main rank")
+        return
+
+    if not os.path.isdir(adapter_path):
+        raise FileNotFoundError(f"LoRA adapter folder not found: {adapter_path}")
+
+    local_rank = _get_local_rank()
+    if torch.cuda.is_available():
+        torch.cuda.set_device(local_rank)
+        device = f"cuda:{local_rank}"
+    else:
+        device = "cpu"
+
     
     # Load the base model and tokenizer
     tokenizer = AutoTokenizer.from_pretrained(base_model_path)
     model = AutoModelForCausalLM.from_pretrained(
         base_model_path,
-        torch_dtype=torch.bfloat16 if torch.cuda.is_bf16_supported() else torch.float16,
-        device_map={"": local_rank},
-    )
+        torch_dtype=torch.bfloat16 if torch.cuda.is_bf16_supported() else torch.float16
+    ).to(device)
 
     logger.info("Re-applying embedding size reduction for merging")
     keep_tok = list('ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!?.:,;*+/-=') + tokenizer.tokenize('\n')
