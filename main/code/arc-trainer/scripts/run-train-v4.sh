@@ -55,4 +55,4 @@ echo "Launching torchrun with 4 ranks on $(hostname)"
 torchrun \
   --nproc_per_node=4 \
   --master_port="${MASTER_PORT}" \
-  main/code/arc-trainer/train_v4.py
+  main/code/arc-trainer/train_v3.py

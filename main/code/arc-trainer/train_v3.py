@@ -634,7 +634,7 @@ neoneye_path = os.path.join(base_path, 'arc-dataset-collection')  # https://gith
 
 # output paths
 base_model_path = "/ocean/projects/cis250063p/jbentley/ARC-AGI-2/Capstone-ARC2/shared/arc/outputs/models"
-save_model_path = os.path.join(base_model_path, "Mistral-Minitron-8B")
+save_model_path = os.path.join(base_model_path, "Mistral-Minitron-8B-Full-Train")
 
 import torch.distributed as dist, os
 rank = int(os.environ.get("RANK", -1))
@@ -858,14 +858,14 @@ def main():
             
             # load training data
             logger.info("Loading and preparing training data")
-            arc_eval_set = ArcDataset.load_from_json(os.path.join(arc_data_path, 'arc-agi_evaluation_challenges.json'))
-            arc_eval_set = arc_eval_set.load_solutions(os.path.join(arc_data_path, 'arc-agi_evaluation_solutions.json'))
+            #arc_eval_set = ArcDataset.load_from_json(os.path.join(arc_data_path, 'arc-agi_evaluation_challenges.json'))
+            #arc_eval_set = arc_eval_set.load_solutions(os.path.join(arc_data_path, 'arc-agi_evaluation_solutions.json'))
             concept_arc = ArcDataset.load_from_neoneye(os.path.join(neoneye_path, 'dataset', 'ConceptARC'))
             mix_datasets = {
-                            'arceval': arc_eval_set.move_test_to_train().repeat(32),
-                            'concept': concept_arc.move_test_to_train().repeat(32),
+                            #'arceval': arc_eval_set.move_test_to_train().repeat(128),
+                            'concept': concept_arc.move_test_to_train().repeat(128),
                 }
-            train_dataset = ArcDataset.load_from_rearc(re_arc_path, n=60, sizes=[3], seed=42, mix_datasets=mix_datasets)
+            train_dataset = ArcDataset.load_from_rearc(re_arc_path, n=644, sizes=[6], seed=42, mix_datasets=mix_datasets)
 
             # augment data set and transform to list
             logger.info("Augmenting training data")
