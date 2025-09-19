@@ -873,23 +873,49 @@ def main():
             train_dataset_augment = train_dataset.augment(**train_aug_opts)
             # train_dataset_as_list = train_dataset_augment.as_list(len_name='text', **fmt_opts)
 
-            # First get the raw text samples
-            text_samples = [ex['text'] for ex in train_dataset_augment.as_list(len_name='text', **fmt_opts)]
+  
+        
 
-            # Then convert them to the format expected by the tokenizer
-            def tokenize_function(examples):
-                tokenized = tokenizer(examples['text'], padding=False, truncation=True, max_length=fmt_opts['max_tokens'])
-                return tokenized
+            from datasets import IterableDataset
 
+            def gen():
+                # Instead of building a huge list, just stream examples
+                for i, ex in enumerate(train_dataset_augment.as_list(len_name='text', **fmt_opts)):
+                    if i % world == rank:  # simple sharding across DDP ranks
+                        yield {"text": ex["text"]}
+
+            raw_dataset = IterableDataset.from_generator(gen)
             # Create the dataset with the text field
-            raw_dataset = Dataset.from_dict({"text": text_samples})
+            def tokenize_function(examples):
+                return tokenizer(
+                    examples["text"], 
+                    padding=False, 
+                    truncation=True, 
+                    max_length=fmt_opts["max_tokens"]
+                )
 
-            # Then tokenize it
             tokenized_dataset = raw_dataset.map(
                 tokenize_function,
-                batched=True,
                 remove_columns=["text"]
             )
+
+            # # First get the raw text samples
+            # text_samples = [ex['text'] for ex in train_dataset_augment.as_list(len_name='text', **fmt_opts)]
+
+
+            # # Then convert them to the format expected by the tokenizer
+            # def tokenize_function(examples):
+            #     tokenized = tokenizer(examples['text'], padding=False, truncation=True, max_length=fmt_opts['max_tokens'])
+            #     return tokenized
+            
+            #raw_dataset = Dataset.from_dict({"text": text_samples})
+
+            # # Then tokenize it
+            # tokenized_dataset = raw_dataset.map(
+            #     tokenize_function,
+            #     batched=True,
+            #     remove_columns=["text"]
+            # )
 
             # logger.info(f"Prepared {len(train_dataset_as_list)} training examples")
             # print(f"First example: {train_dataset_as_list[0]}")            
