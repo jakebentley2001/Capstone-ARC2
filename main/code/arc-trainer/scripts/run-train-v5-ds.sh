@@ -22,6 +22,14 @@ cd "$PROJECT_ROOT" || exit 1
 eval "$(conda shell.bash hook)"
 conda activate arc-env
 
+module purge
+module load cuda/12.4         # <-- load a version that exists on your cluster
+
+# Ensure CUDA_HOME is set (some modules set it for you; this just in case)
+export CUDA_HOME=${CUDA_HOME:-$(dirname "$(dirname "$(which nvcc)")")}
+export PATH="$CUDA_HOME/bin:$PATH"
+export LD_LIBRARY_PATH="$CUDA_HOME/lib64:$LD_LIBRARY_PATH"
+
 # --- Hugging Face caches (no deprecated TRANSFORMERS_CACHE) ---
 export HF_HOME="$CACHE_ROOT/hf"
 export HF_DATASETS_CACHE="$CACHE_ROOT/ds"
