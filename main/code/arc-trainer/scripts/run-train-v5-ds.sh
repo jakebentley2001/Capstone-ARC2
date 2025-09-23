@@ -21,7 +21,6 @@ cd "$PROJECT_ROOT" || exit 1
 # --- Conda env ---
 eval "$(conda shell.bash hook)"
 conda activate arc-env
-pip install deepspeed
 
 # --- Hugging Face caches (no deprecated TRANSFORMERS_CACHE) ---
 export HF_HOME="$CACHE_ROOT/hf"
