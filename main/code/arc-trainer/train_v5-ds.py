@@ -599,6 +599,7 @@ from datetime import datetime
 
 import logging
 
+
 os.environ["HF_HOME"] = "/ocean/projects/cis250063p/jbentley/ARC-AGI-2/Capstone-ARC2/shared/arc/cache/hf"
 os.environ["TRANSFORMERS_CACHE"] = "/ocean/projects/cis250063p/jbentley/ARC-AGI-2/Capstone-ARC2/shared/arc/cache/hf"
 os.environ["HF_DATASETS_CACHE"] = "/ocean/projects/cis250063p/jbentley/ARC-AGI-2/Capstone-ARC2/shared/arc/cache/ds"
@@ -624,6 +625,20 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 logger.info(f"Logging to {log_file}")
+
+rank = int(os.environ.get("RANK", 0))           # global rank set by DeepSpeed/torchrun
+local_rank = int(os.environ.get("LOCAL_RANK", 0))
+world_size = int(os.environ.get("WORLD_SIZE", 1))
+
+# Add a per-rank file handler alongside your existing handlers
+per_rank_log = os.path.join(log_dir, f"train_rank{rank}.log")
+fh = logging.FileHandler(per_rank_log, mode="w")
+fh.setLevel(logging.INFO)
+fh.setFormatter(logging.Formatter("%(asctime)s - %(levelname)s - %(message)s"))
+logger.addHandler(fh)
+
+logger.info(f"RANK={rank} LOCAL_RANK={local_rank} WORLD_SIZE={world_size}")
+
 
 base_path = '/ocean/projects/cis250063p/jbentley/ARC-AGI-2/Capstone-ARC2/shared/arc/data/ARC-Data/input'
 # input paths
