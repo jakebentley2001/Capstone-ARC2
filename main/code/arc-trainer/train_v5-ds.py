@@ -936,7 +936,6 @@ def main():
                 logging_first_step=True,
                 logging_steps=5,
                 disable_tqdm=False,          # force progress bar even without a TTY
-                report_to='none',
                 save_strategy='no',
                 report_to='none',
                 seed=42,
