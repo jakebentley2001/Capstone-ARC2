@@ -932,7 +932,11 @@ def main():
                 weight_decay=0.00,
                 fp16=not torch.cuda.is_bf16_supported(),
                 bf16=torch.cuda.is_bf16_supported(),
-                logging_steps=10,
+                logging_strategy="steps",
+                logging_first_step=True,
+                logging_steps=5,
+                disable_tqdm=False,          # force progress bar even without a TTY
+                report_to='none',
                 save_strategy='no',
                 report_to='none',
                 seed=42,
