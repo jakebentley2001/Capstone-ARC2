@@ -47,4 +47,4 @@ export DS_BUILD_OPS=0
 export DS_SKIP_CUDA_CHECK=1
 export DS_BUILD_AIO=0
 # Run your Python script
-deepspeed --num_gpus=auto main/code/arc-trainer/train_v5-ds.py
+deepspeed --num_gpus=4 main/code/arc-trainer/train_v5-ds.py
