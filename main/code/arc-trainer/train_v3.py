@@ -894,14 +894,14 @@ def main():
                 concept_arc = ArcDataset.load_from_neoneye(os.path.join(neoneye_path, "dataset", "ConceptARC"))
                 mix_datasets = {
                     # "arceval": arc_eval_set.move_test_to_train().repeat(128),
-                    "concept": concept_arc.move_test_to_train().repeat(128),
+                    "concept": concept_arc.move_test_to_train().repeat(32),
                 }
 
                 # 2) Build Re-ARC + mix
                 train_dataset = ArcDataset.load_from_rearc(
                     re_arc_path,
-                    n=644,
-                    sizes=[6],
+                    n=64,
+                    sizes=[3],
                     seed=42,
                     mix_datasets=mix_datasets,
                 )
@@ -915,12 +915,15 @@ def main():
                 # 4) Stream out text samples one-by-one (no giant lists)
                 def build_stream_of_texts():
                     for k in train_dataset_augment.keys:
-                        _, fmt = train_dataset_augment.get_task(k, **fmt_opts)  # fmt["text"] is the full prompt+target
+                        _, fmt = train_dataset_augment.get_task(k, len_name="text", **fmt_opts)
                         yield {"text": fmt["text"]}
 
+                logger.info("Building Stream")
                 raw = datasets.Dataset.from_generator(build_stream_of_texts)
 
                 # 5) Tokenize and save atomically
+                logger.info(f"Length of raw: {len(raw)}")
+                logger.info("Tokenizing Raw")
                 tokenized = tokenize_fn(raw)
                 os.makedirs(os.path.dirname(disk_ds_dir), exist_ok=True)
                 tmp_dir = disk_ds_dir + ".tmp"
@@ -936,6 +939,7 @@ def main():
             while not os.path.exists(disk_ds_dir):
                 time.sleep(1)
 
+            logger.info("Loading to all ")
             tokenized_dataset = datasets.load_from_disk(disk_ds_dir)
             tokenized_dataset = tokenized_dataset.shard(
                 num_shards=max(int(world), 1),
