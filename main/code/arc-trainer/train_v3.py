@@ -894,14 +894,14 @@ def main():
                 concept_arc = ArcDataset.load_from_neoneye(os.path.join(neoneye_path, "dataset", "ConceptARC"))
                 mix_datasets = {
                     # "arceval": arc_eval_set.move_test_to_train().repeat(128),
-                    "concept": concept_arc.move_test_to_train().repeat(32),
+                    "concept": concept_arc.move_test_to_train().repeat(128),
                 }
 
                 # 2) Build Re-ARC + mix
                 train_dataset = ArcDataset.load_from_rearc(
                     re_arc_path,
-                    n=64,
-                    sizes=[3],
+                    n=644,
+                    sizes=[6],
                     seed=42,
                     mix_datasets=mix_datasets,
                 )
