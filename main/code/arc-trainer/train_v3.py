@@ -370,7 +370,6 @@ class ArcDataset(object):
         return score
 
 
-import os
 import json
 import torch
 import peft
@@ -577,7 +576,6 @@ def keep_single_char_tokens(model, tokenizer, keep=None, keep_norm=False, keep_m
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import os
 import torch
 import time
 import shutil
