@@ -859,120 +859,206 @@ def main():
             )
             model = get_peft_model(model, lora_config)
             
-            # load training data
+
+            # ========= Pattern A: rank-0 builds once; all ranks load + shard =========
             logger.info("Loading and preparing training data")
-            #arc_eval_set = ArcDataset.load_from_json(os.path.join(arc_data_path, 'arc-agi_evaluation_challenges.json'))
-            #arc_eval_set = arc_eval_set.load_solutions(os.path.join(arc_data_path, 'arc-agi_evaluation_solutions.json'))
-            # --- 1) Load ConceptARC (neoneye format) and prepare it as extra training data ---
-            concept_arc = ArcDataset.load_from_neoneye(os.path.join(neoneye_path, 'dataset', 'ConceptARC'))
-            mix_datasets = {
-                # 'arceval': arc_eval_set.move_test_to_train().repeat(128),   # (disabled) ARC eval set: move test→train then repeat heavily
-                'concept': concept_arc.move_test_to_train().repeat(128),      # take ConceptARC tasks, move test→train so outputs are available,
-                                                                            # then REPEAT 128× (⚠️ huge multiplier on sample count & RAM)
-            }
 
-            # --- 2) Build the base training set from Re-ARC and mix in the extra datasets above ---
-            train_dataset = ArcDataset.load_from_rearc(
-                re_arc_path,           # path to Re-ARC in neoneye format
-                n=644,                 # number of "epochs" over Re-ARC keys (⚠️ large; multiplies size)
-                sizes=[6],             # for each epoch: 6 train + 1 test per base key (7 total)
-                seed=42,               # RNG seed for deterministic sampling/shuffling within loader
-                mix_datasets=mix_datasets  # merges your 'concept' (and optionally others) into the final dataset
-            )
+            import datasets  # ok to import here; avoid re-importing os/dist inside functions
 
-            # --- 3) Apply augmentation by transforming keys (NOT generating strings yet) ---
-            logger.info("Augmenting training data")
-            train_aug_opts = dict(
-                tp=True,    # allow transpose augmentation (random single transpose unless 'all')
-                rt=True,    # allow rotations (random single 0/90/180/270 unless 'all')
-                perm=True,  # allow palette permutation (color remapping)
-                shfl_ex=True, # shuffle example indices for multi-example tasks
-                seed=0
-            )
-            train_dataset_augment = train_dataset.augment(**train_aug_opts)
-            # NOTE: Up to here, we only transformed KEYS (lazy). We have NOT materialized giant text samples.
-            # train_dataset_as_list = train_dataset_augment.as_list(len_name='text', **fmt_opts)
-            # ^ This would eagerly build ALL strings → big RAM spike. We intentionally avoid that.
+            # rank/world helpers (no dist.barrier needed; we poll for the saved dataset)
+            rank = int(os.environ.get("RANK", "0"))
+            world = int(os.environ.get("WORLD_SIZE", "1"))
 
-            # --- 4) Distributed/Rank helpers (DDP awareness) ---
-            import datasets, torch.distributed as dist
-
-            def _is_dist():
-                # True only if torch.distributed initialized (e.g., under torchrun)
-                return dist.is_available() and dist.is_initialized()
-
-            def _rank_world():
-                # Read env vars that torchrun sets per process.
-                # Defaults let single-process runs behave sensibly (rank=0, world=1).
-                return int(os.environ.get("RANK", "0")), int(os.environ.get("WORLD_SIZE", "1"))
-
-            def _barrier():
-                # Synchronize all ranks to avoid race conditions (e.g., reading before rank-0 finishes writing).
-                if _is_dist():
-                    dist.barrier()
-
-            rank, world = _rank_world()
-
-            # On-disk directory where the tokenized dataset will be written once (by rank 0)
             disk_ds_dir = "/ocean/projects/cis250063p/jbentley/ARC-AGI-2/Capstone-ARC2/shared/arc/outputs/datasets/train_tokenized"
 
-            # --- 5) Build a streaming generator that yields ONE sample at a time ---
-            def build_stream_of_texts():
-                """
-                Iterate over augmented keys and lazily format each into a 'text' sample.
-                This avoids building a giant Python list of strings in memory.
-                """
-                for k in train_dataset_augment.keys:
-                    _, fmt = train_dataset_augment.get_task(k, **fmt_opts)  # fmt contains {"text", "train", "query", ...}
-                    yield {"text": fmt["text"]}                             # yield small dicts; datasets will stream-consume them
-
-            def builder_fn():
-                """
-                Wrap generator into a HuggingFace Dataset (streamed).
-                No full in-RAM materialization; HF will iterate the generator.
-                """
-                return datasets.Dataset.from_generator(build_stream_of_texts)
-
             def tokenize_fn(ds):
-                """
-                Tokenize the streaming dataset into model-ready features.
-                - batched=True to batch multiple rows per tokenizer call
-                - remove original 'text' column (saves memory)
-                - num_proc=4: parallel tokenization on rank-0 only (fine; others don't build)
-                TIP: add batch_size / writer_batch_size / load_from_cache_file=False for tighter RAM/IO control.
-                """
+                # Tokenize streamed rows; keep RAM low
                 return ds.map(
                     lambda ex: tokenizer(
                         ex["text"],
-                        padding=False,                     # pack per-sample; Trainer/Collator handles batch pad
+                        padding=False,
                         truncation=True,
-                        max_length=fmt_opts["max_tokens"]  # hard cap on sequence length
+                        max_length=fmt_opts["max_tokens"],
                     ),
                     batched=True,
+                    batch_size=64,           # tune as needed
                     remove_columns=["text"],
-                    num_proc=4  # optional parallelism during the build step
+                    num_proc=4,              # only used on rank 0 (others don't build)
+                    writer_batch_size=1000,
+                    load_from_cache_file=False,
                 )
 
-            # --- 6) Rank-0 builds & saves once; other ranks wait, then everyone memory-maps and shards ---
-            # IMPORTANT:
-            # - Ensure tokenizer is FINAL (pad token added, vocab shrink done) BEFORE this point,
-            #   or token IDs in saved Arrow won't match later at train time.
-            if rank in (-1, 0):  # treat rank=-1 (single-process) and rank 0 as "main"
-                raw = builder_fn()                      # stream raw rows
-                tokenized = tokenize_fn(raw)            # tokenize into input_ids/attention_mask (and possibly others)
-                os.makedirs(disk_ds_dir, exist_ok=True)
-                tokenized.save_to_disk(disk_ds_dir)     # write Arrow on disk; memory-mappable
+            if rank in (-1, 0):
+                # ------- Build EVERYTHING only on rank 0 -------
+                # 1) Load ConceptARC and make the mix
+                concept_arc = ArcDataset.load_from_neoneye(os.path.join(neoneye_path, "dataset", "ConceptARC"))
+                mix_datasets = {
+                    # "arceval": arc_eval_set.move_test_to_train().repeat(128),
+                    "concept": concept_arc.move_test_to_train().repeat(128),
+                }
 
-            # Sync so all workers see the saved dataset
-            _barrier()
+                # 2) Build Re-ARC + mix
+                train_dataset = ArcDataset.load_from_rearc(
+                    re_arc_path,
+                    n=644,
+                    sizes=[6],
+                    seed=42,
+                    mix_datasets=mix_datasets,
+                )
 
-            # All ranks: memory-map the SAME on-disk dataset (low RAM), then take 1/world slice
+                # 3) Augment keys (lazy; no strings yet)
+                logger.info("Augmenting training data")
+                train_dataset_augment = train_dataset.augment(
+                    tp=True, rt=True, perm=True, shfl_ex=True, seed=0
+                )
+
+                # 4) Stream out text samples one-by-one (no giant lists)
+                def build_stream_of_texts():
+                    for k in train_dataset_augment.keys:
+                        _, fmt = train_dataset_augment.get_task(k, **fmt_opts)  # fmt["text"] is the full prompt+target
+                        yield {"text": fmt["text"]}
+
+                raw = datasets.Dataset.from_generator(build_stream_of_texts)
+
+                # 5) Tokenize and save atomically
+                tokenized = tokenize_fn(raw)
+                os.makedirs(os.path.dirname(disk_ds_dir), exist_ok=True)
+                tmp_dir = disk_ds_dir + ".tmp"
+                if os.path.exists(tmp_dir):
+                    shutil.rmtree(tmp_dir)
+                tokenized.save_to_disk(tmp_dir)
+                # atomic replace so other ranks don't read a half-written dir
+                if os.path.exists(disk_ds_dir):
+                    shutil.rmtree(disk_ds_dir)
+                os.replace(tmp_dir, disk_ds_dir)
+
+            # ------- All ranks: wait until dataset exists, then memory-map and shard -------
+            while not os.path.exists(disk_ds_dir):
+                time.sleep(1)
+
             tokenized_dataset = datasets.load_from_disk(disk_ds_dir)
             tokenized_dataset = tokenized_dataset.shard(
-                num_shards=world,   # total distributed ranks
-                index=rank,         # this rank's slice
-                contiguous=True     # improves locality for big sequential reads
+                num_shards=max(int(world), 1),
+                index=int(rank),
+                contiguous=True,
             )
+            # ======================= end Pattern A block =======================
+
+
+            # # load training data
+            # logger.info("Loading and preparing training data")
+            # #arc_eval_set = ArcDataset.load_from_json(os.path.join(arc_data_path, 'arc-agi_evaluation_challenges.json'))
+            # #arc_eval_set = arc_eval_set.load_solutions(os.path.join(arc_data_path, 'arc-agi_evaluation_solutions.json'))
+            # # --- 1) Load ConceptARC (neoneye format) and prepare it as extra training data ---
+            # concept_arc = ArcDataset.load_from_neoneye(os.path.join(neoneye_path, 'dataset', 'ConceptARC'))
+            # mix_datasets = {
+            #     # 'arceval': arc_eval_set.move_test_to_train().repeat(128),   # (disabled) ARC eval set: move test→train then repeat heavily
+            #     'concept': concept_arc.move_test_to_train().repeat(128),      # take ConceptARC tasks, move test→train so outputs are available,
+            #                                                                 # then REPEAT 128× (⚠️ huge multiplier on sample count & RAM)
+            # }
+
+            # # --- 2) Build the base training set from Re-ARC and mix in the extra datasets above ---
+            # train_dataset = ArcDataset.load_from_rearc(
+            #     re_arc_path,           # path to Re-ARC in neoneye format
+            #     n=644,                 # number of "epochs" over Re-ARC keys (⚠️ large; multiplies size)
+            #     sizes=[6],             # for each epoch: 6 train + 1 test per base key (7 total)
+            #     seed=42,               # RNG seed for deterministic sampling/shuffling within loader
+            #     mix_datasets=mix_datasets  # merges your 'concept' (and optionally others) into the final dataset
+            # )
+
+            # # --- 3) Apply augmentation by transforming keys (NOT generating strings yet) ---
+            # logger.info("Augmenting training data")
+            # train_aug_opts = dict(
+            #     tp=True,    # allow transpose augmentation (random single transpose unless 'all')
+            #     rt=True,    # allow rotations (random single 0/90/180/270 unless 'all')
+            #     perm=True,  # allow palette permutation (color remapping)
+            #     shfl_ex=True, # shuffle example indices for multi-example tasks
+            #     seed=0
+            # )
+            # train_dataset_augment = train_dataset.augment(**train_aug_opts)
+            # # NOTE: Up to here, we only transformed KEYS (lazy). We have NOT materialized giant text samples.
+            # # train_dataset_as_list = train_dataset_augment.as_list(len_name='text', **fmt_opts)
+            # # ^ This would eagerly build ALL strings → big RAM spike. We intentionally avoid that.
+
+            # # --- 4) Distributed/Rank helpers (DDP awareness) ---
+            # import datasets, torch.distributed as dist
+
+            # def _is_dist():
+            #     # True only if torch.distributed initialized (e.g., under torchrun)
+            #     return dist.is_available() and dist.is_initialized()
+
+            # def _rank_world():
+            #     # Read env vars that torchrun sets per process.
+            #     # Defaults let single-process runs behave sensibly (rank=0, world=1).
+            #     return int(os.environ.get("RANK", "0")), int(os.environ.get("WORLD_SIZE", "1"))
+
+            # def _barrier():
+            #     # Synchronize all ranks to avoid race conditions (e.g., reading before rank-0 finishes writing).
+            #     if _is_dist():
+            #         dist.barrier()
+
+            # rank, world = _rank_world()
+
+            # # On-disk directory where the tokenized dataset will be written once (by rank 0)
+            # disk_ds_dir = "/ocean/projects/cis250063p/jbentley/ARC-AGI-2/Capstone-ARC2/shared/arc/outputs/datasets/train_tokenized"
+
+            # # --- 5) Build a streaming generator that yields ONE sample at a time ---
+            # def build_stream_of_texts():
+            #     """
+            #     Iterate over augmented keys and lazily format each into a 'text' sample.
+            #     This avoids building a giant Python list of strings in memory.
+            #     """
+            #     for k in train_dataset_augment.keys:
+            #         _, fmt = train_dataset_augment.get_task(k, **fmt_opts)  # fmt contains {"text", "train", "query", ...}
+            #         yield {"text": fmt["text"]}                             # yield small dicts; datasets will stream-consume them
+
+            # def builder_fn():
+            #     """
+            #     Wrap generator into a HuggingFace Dataset (streamed).
+            #     No full in-RAM materialization; HF will iterate the generator.
+            #     """
+            #     return datasets.Dataset.from_generator(build_stream_of_texts)
+
+            # def tokenize_fn(ds):
+            #     """
+            #     Tokenize the streaming dataset into model-ready features.
+            #     - batched=True to batch multiple rows per tokenizer call
+            #     - remove original 'text' column (saves memory)
+            #     - num_proc=4: parallel tokenization on rank-0 only (fine; others don't build)
+            #     TIP: add batch_size / writer_batch_size / load_from_cache_file=False for tighter RAM/IO control.
+            #     """
+            #     return ds.map(
+            #         lambda ex: tokenizer(
+            #             ex["text"],
+            #             padding=False,                     # pack per-sample; Trainer/Collator handles batch pad
+            #             truncation=True,
+            #             max_length=fmt_opts["max_tokens"]  # hard cap on sequence length
+            #         ),
+            #         batched=True,
+            #         remove_columns=["text"],
+            #         num_proc=4  # optional parallelism during the build step
+            #     )
+
+            # # --- 6) Rank-0 builds & saves once; other ranks wait, then everyone memory-maps and shards ---
+            # # IMPORTANT:
+            # # - Ensure tokenizer is FINAL (pad token added, vocab shrink done) BEFORE this point,
+            # #   or token IDs in saved Arrow won't match later at train time.
+            # if rank in (-1, 0):  # treat rank=-1 (single-process) and rank 0 as "main"
+            #     raw = builder_fn()                      # stream raw rows
+            #     tokenized = tokenize_fn(raw)            # tokenize into input_ids/attention_mask (and possibly others)
+            #     os.makedirs(disk_ds_dir, exist_ok=True)
+            #     tokenized.save_to_disk(disk_ds_dir)     # write Arrow on disk; memory-mappable
+
+            # # Sync so all workers see the saved dataset
+            # _barrier()
+
+            # # All ranks: memory-map the SAME on-disk dataset (low RAM), then take 1/world slice
+            # tokenized_dataset = datasets.load_from_disk(disk_ds_dir)
+            # tokenized_dataset = tokenized_dataset.shard(
+            #     num_shards=world,   # total distributed ranks
+            #     index=rank,         # this rank's slice
+            #     contiguous=True     # improves locality for big sequential reads
+            # )
 
 
             # # First get the raw text samples
