@@ -895,7 +895,7 @@ def main():
             # ^ This would eagerly build ALL strings → big RAM spike. We intentionally avoid that.
 
             # --- 4) Distributed/Rank helpers (DDP awareness) ---
-            import datasets, torch.distributed as dist, os
+            import datasets, torch.distributed as dist
 
             def _is_dist():
                 # True only if torch.distributed initialized (e.g., under torchrun)
