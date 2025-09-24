@@ -878,31 +878,52 @@ def main():
             train_dataset_augment = train_dataset.augment(**train_aug_opts)
             # train_dataset_as_list = train_dataset_augment.as_list(len_name='text', **fmt_opts)
 
-  
-        
+            import datasets, torch.distributed as dist, os
 
-            from datasets import IterableDataset
+            def _is_dist():
+                return dist.is_available() and dist.is_initialized()
 
-            def gen():
-                # Instead of building a huge list, just stream examples
-                for i, ex in enumerate(train_dataset_augment.as_list(len_name='text', **fmt_opts)):
-                    if i % world == rank:  # simple sharding across DDP ranks
-                        yield {"text": ex["text"]}
+            def _rank_world():
+                return int(os.environ.get("RANK", "0")), int(os.environ.get("WORLD_SIZE", "1"))
 
-            raw_dataset = IterableDataset.from_generator(gen)
-            # Create the dataset with the text field
-            def tokenize_function(examples):
-                return tokenizer(
-                    examples["text"], 
-                    padding=False, 
-                    truncation=True, 
-                    max_length=fmt_opts["max_tokens"]
+            def _barrier():
+                if _is_dist():
+                    dist.barrier()
+
+            rank, world = _rank_world()
+            disk_ds_dir = "/ocean/projects/cis250063p/jbentley/ARC-AGI-2/Capstone-ARC2/shared/arc/outputs/datasets/train_tokenized"  # pick a dir
+            
+            def build_stream_of_texts():
+                # yield one example at a time: no giant lists
+                for k in train_dataset_augment.keys:
+                    _, fmt = train_dataset_augment.get_task(k, **fmt_opts)
+                    yield {"text": fmt["text"]}
+
+            def builder_fn():
+                # build a streaming dataset (no in-memory list)
+                return datasets.Dataset.from_generator(build_stream_of_texts)
+
+            def tokenize_fn(ds):
+                return ds.map(
+                    lambda ex: tokenizer(ex["text"], padding=False, truncation=True, max_length=fmt_opts["max_tokens"]),
+                    batched=True,
+                    remove_columns=["text"],
+                    num_proc=4  # optional
                 )
 
-            tokenized_dataset = raw_dataset.map(
-                tokenize_function,
-                remove_columns=["text"]
-            )
+            # Rank 0 builds & saves once
+            if rank in (-1, 0):
+                raw = builder_fn()
+                tokenized = tokenize_fn(raw)
+                os.makedirs(disk_ds_dir, exist_ok=True)
+                tokenized.save_to_disk(disk_ds_dir)
+
+            # Everyone waits, then memory-maps and shards
+            _barrier()
+            tokenized_dataset = datasets.load_from_disk(disk_ds_dir)
+            tokenized_dataset = tokenized_dataset.shard(num_shards=world, index=rank, contiguous=True)
+
+
 
             # # First get the raw text samples
             # text_samples = [ex['text'] for ex in train_dataset_augment.as_list(len_name='text', **fmt_opts)]
@@ -913,7 +934,7 @@ def main():
             #     tokenized = tokenizer(examples['text'], padding=False, truncation=True, max_length=fmt_opts['max_tokens'])
             #     return tokenized
             
-            #raw_dataset = Dataset.from_dict({"text": text_samples})
+            # raw_dataset = Dataset.from_dict({"text": text_samples})
 
             # # Then tokenize it
             # tokenized_dataset = raw_dataset.map(
@@ -922,10 +943,7 @@ def main():
             #     remove_columns=["text"]
             # )
 
-            # logger.info(f"Prepared {len(train_dataset_as_list)} training examples")
-            # print(f"First example: {train_dataset_as_list[0]}")            
     
-            
 
             # run training with DeepSpeed
             tokenizer.padding_side = 'right'
