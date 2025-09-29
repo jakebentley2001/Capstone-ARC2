@@ -632,7 +632,7 @@ neoneye_path = os.path.join(base_path, 'arc-dataset-collection')  # https://gith
 
 # output paths
 base_model_path = "/ocean/projects/cis250063p/jbentley/ARC-AGI-2/Capstone-ARC2/shared/arc/outputs/models"
-save_model_path = os.path.join(base_model_path, "Mistral-Minitron-8B-Full-Train")
+save_model_path = os.path.join(base_model_path, "Mistral-Minitron-8B-Nemo-Mix-Train")
 
 import torch.distributed as dist
 rank = int(os.environ.get("RANK", -1))
