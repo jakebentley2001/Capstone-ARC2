@@ -625,14 +625,15 @@ logger.info(f"Logging to {log_file}")
 
 base_path = '/ocean/projects/cis250063p/jbentley/ARC-AGI-2/Capstone-ARC2/shared/arc/data/ARC-Data/input'
 # input paths
-base_model = 'Qwen/Qwen2.5-7B-Instruct-AWQ'  # auto-downloaded from huggingface.co
+  # auto-downloaded from huggingface.co
+base_model = "Qwen/Qwen2.5-7B-Instruct" #base_model = 'Qwen/Qwen2.5-7B-Instruct-AWQ'
 arc_data_path = os.path.join(base_path, 'sub-arc-prize-2024')  # as on kaggle arc prize 2024
 re_arc_path = os.path.join(base_path, 're_arc')  # https://github.com/michaelhodel/re-arc
 neoneye_path = os.path.join(base_path, 'arc-dataset-collection')  # https://github.com/neoneye/arc-dataset-collection)
 
 # output paths
 base_model_path = "/ocean/projects/cis250063p/jbentley/ARC-AGI-2/Capstone-ARC2/shared/arc/outputs/models"
-save_model_path = os.path.join(base_model_path, "Qwen2.5-7B-Instruct-AWQ-Nemo-Mix-Train")
+save_model_path = os.path.join(base_model_path, "Qwen2.5-7B-Instruct-Nemo-Mix-Train")
 
 import torch.distributed as dist
 rank = int(os.environ.get("RANK", -1))
@@ -719,7 +720,7 @@ def load_model_and_tokenizer(model_name):
     # Load the model with quantization config
     model = AutoModelForCausalLM.from_pretrained(
         model_name,
-        #quantization_config=quantization_config,
+        quantization_config=quantization_config,
         torch_dtype=torch.bfloat16 if torch.cuda.is_bf16_supported() else torch.float16,
         device_map={"": local_rank},
     )
