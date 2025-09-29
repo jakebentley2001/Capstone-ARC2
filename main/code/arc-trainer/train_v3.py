@@ -958,7 +958,7 @@ def main():
                 output_dir='/ocean/projects/cis250063p/jbentley/ARC-AGI-2/Capstone-ARC2/shared/arc/outputs/runs/tmp_output',
                 num_train_epochs=1,
                 per_device_train_batch_size=1,  # Increased to match DeepSpeed config
-                gradient_accumulation_steps=2,  # No need for gradient accumulation
+                gradient_accumulation_steps=8,  # No need for gradient accumulation
                 warmup_ratio=0.25,
                 learning_rate=1e-4,
                 weight_decay=0.00,
