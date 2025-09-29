@@ -719,7 +719,7 @@ def load_model_and_tokenizer(model_name):
     # Load the model with quantization config
     model = AutoModelForCausalLM.from_pretrained(
         model_name,
-        quantization_config=quantization_config,
+        #quantization_config=quantization_config,
         torch_dtype=torch.bfloat16 if torch.cuda.is_bf16_supported() else torch.float16,
         device_map={"": local_rank},
     )
