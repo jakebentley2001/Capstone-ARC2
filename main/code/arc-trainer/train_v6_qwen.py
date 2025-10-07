@@ -628,12 +628,13 @@ base_path = '/ocean/projects/cis250063p/jbentley/ARC-AGI-2/Capstone-ARC2/shared/
   # auto-downloaded from huggingface.co
 base_model = "Qwen/Qwen2.5-7B-Instruct" #base_model = 'Qwen/Qwen2.5-7B-Instruct-AWQ'
 arc_data_path = os.path.join(base_path, 'sub-arc-prize-2024')  # as on kaggle arc prize 2024
+arc_2_data_path = os.path.join(base_path,'train-arc-prize-2025')
 re_arc_path = os.path.join(base_path, 're_arc')  # https://github.com/michaelhodel/re-arc
 neoneye_path = os.path.join(base_path, 'arc-dataset-collection')  # https://github.com/neoneye/arc-dataset-collection)
 
 # output paths
 base_model_path = "/ocean/projects/cis250063p/jbentley/ARC-AGI-2/Capstone-ARC2/shared/arc/outputs/models"
-save_model_path = os.path.join(base_model_path, "Qwen2.5-7B-Instruct-Nemo-Mix-Train")
+save_model_path = os.path.join(base_model_path, "Qwen2.5-7B-Instruct-Nemo-Mix-ARC-2-ADDED")
 
 import torch.distributed as dist
 rank = int(os.environ.get("RANK", -1))
@@ -894,9 +895,16 @@ def main():
                 # 1) Load ConceptARC and make the mix
                 arc_eval_set = ArcDataset.load_from_json(os.path.join(arc_data_path, 'arc-agi_evaluation_challenges.json'))
                 arc_eval_set = arc_eval_set.load_solutions(os.path.join(arc_data_path, 'arc-agi_evaluation_solutions.json'))
+                arc_2_eval_set = ArcDataset.load_from_json(os.path.join(arc_2_data_path, 'arc-agi_evaluation_challenges_subset.json'))
+                arc_2_eval_set = arc_eval_set.load_solutions(os.path.join(arc_2_data_path, 'arc-agi_evaluation_solutions_subset.json'))
+                arc__2_train_set = ArcDataset.load_from_json(os.path.join(arc_2_data_path, 'arc-agi_training_challenges.json'))
+                arc__2_train_set = arc_eval_set.load_solutions(os.path.join(arc_2_data_path, 'arc-agi_training_solutions.json'))
+               
                 concept_arc = ArcDataset.load_from_neoneye(os.path.join(neoneye_path, "dataset", "ConceptARC"))
-                
+        
                 mix_datasets = {
+                    "arc2train": arc__2_train_set.move_test_to_train().repeat(64),
+                    "arc2eval": arc_2_eval_set.move_test_to_train().repeat(128),
                     "arceval": arc_eval_set.move_test_to_train().repeat(64),
                     "concept": concept_arc.move_test_to_train().repeat(64),
                 }
