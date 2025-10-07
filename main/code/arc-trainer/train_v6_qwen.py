@@ -896,9 +896,9 @@ def main():
                 arc_eval_set = ArcDataset.load_from_json(os.path.join(arc_data_path, 'arc-agi_evaluation_challenges.json'))
                 arc_eval_set = arc_eval_set.load_solutions(os.path.join(arc_data_path, 'arc-agi_evaluation_solutions.json'))
                 arc_2_eval_set = ArcDataset.load_from_json(os.path.join(arc_2_data_path, 'arc-agi_evaluation_challenges_subset.json'))
-                arc_2_eval_set = arc_eval_set.load_solutions(os.path.join(arc_2_data_path, 'arc-agi_evaluation_solutions_subset.json'))
+                arc_2_eval_set = arc_2_eval_set.load_solutions(os.path.join(arc_2_data_path, 'arc-agi_evaluation_solutions_subset.json'))
                 arc__2_train_set = ArcDataset.load_from_json(os.path.join(arc_2_data_path, 'arc-agi_training_challenges.json'))
-                arc__2_train_set = arc_eval_set.load_solutions(os.path.join(arc_2_data_path, 'arc-agi_training_solutions.json'))
+                arc__2_train_set = arc__2_train_set.load_solutions(os.path.join(arc_2_data_path, 'arc-agi_training_solutions.json'))
                
                 concept_arc = ArcDataset.load_from_neoneye(os.path.join(neoneye_path, "dataset", "ConceptARC"))
         
