@@ -625,14 +625,16 @@ logger.info(f"Logging to {log_file}")
 
 base_path = '/ocean/projects/cis250063p/jbentley/ARC-AGI-2/Capstone-ARC2/shared/arc/data/ARC-Data/input'
 # input paths
-base_model = 'nvidia/Mistral-NeMo-Minitron-8B-Base'  # auto-downloaded from huggingface.co
+  # auto-downloaded from huggingface.co
+base_model = "Qwen/Qwen3-14B" #base_model = 'Qwen/Qwen2.5-7B-Instruct-AWQ'
 arc_data_path = os.path.join(base_path, 'sub-arc-prize-2024')  # as on kaggle arc prize 2024
+arc_2_data_path = os.path.join(base_path,'train-arc-prize-2025')
 re_arc_path = os.path.join(base_path, 're_arc')  # https://github.com/michaelhodel/re-arc
 neoneye_path = os.path.join(base_path, 'arc-dataset-collection')  # https://github.com/neoneye/arc-dataset-collection)
 
 # output paths
 base_model_path = "/ocean/projects/cis250063p/jbentley/ARC-AGI-2/Capstone-ARC2/shared/arc/outputs/models"
-save_model_path = os.path.join(base_model_path, "Mistral-Minitron-8B-Nemo-Mix-Train")
+save_model_path = os.path.join(base_model_path, "Qwen3-14-Arc-2-Double")
 
 import torch.distributed as dist
 rank = int(os.environ.get("RANK", -1))
@@ -893,9 +895,16 @@ def main():
                 # 1) Load ConceptARC and make the mix
                 arc_eval_set = ArcDataset.load_from_json(os.path.join(arc_data_path, 'arc-agi_evaluation_challenges.json'))
                 arc_eval_set = arc_eval_set.load_solutions(os.path.join(arc_data_path, 'arc-agi_evaluation_solutions.json'))
+                arc_2_eval_set = ArcDataset.load_from_json(os.path.join(arc_2_data_path, 'arc-agi_evaluation_challenges_subset.json'))
+                arc_2_eval_set = arc_2_eval_set.load_solutions(os.path.join(arc_2_data_path, 'arc-agi_evaluation_solutions_subset.json'))
+                arc__2_train_set = ArcDataset.load_from_json(os.path.join(arc_2_data_path, 'arc-agi_training_challenges.json'))
+                arc__2_train_set = arc__2_train_set.load_solutions(os.path.join(arc_2_data_path, 'arc-agi_training_solutions.json'))
+               
                 concept_arc = ArcDataset.load_from_neoneye(os.path.join(neoneye_path, "dataset", "ConceptARC"))
-                
+        
                 mix_datasets = {
+                    "arc2train": arc__2_train_set.move_test_to_train().repeat(64),
+                    "arc2eval": arc_2_eval_set.move_test_to_train().repeat(128),
                     "arceval": arc_eval_set.move_test_to_train().repeat(64),
                     "concept": concept_arc.move_test_to_train().repeat(64),
                 }
@@ -961,7 +970,6 @@ def main():
                 gradient_accumulation_steps=8,  # No need for gradient accumulation
                 warmup_ratio=0.25,
                 learning_rate=1e-4,
-                embedding_learning_rate=1e-5,
                 weight_decay=0.00,
                 fp16=not torch.cuda.is_bf16_supported(),
                 bf16=torch.cuda.is_bf16_supported(),
