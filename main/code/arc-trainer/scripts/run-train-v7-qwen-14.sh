@@ -39,6 +39,30 @@ export DS_BUILD_OPS=0
 export DS_SKIP_CUDA_CHECK=1
 export DS_BUILD_AIO=0
 
+# EDITTED HERE
+unset PYTHONPATH
+export PYTHONNOUSERSITE=1
+
+# show exactly what python and torchrun you're using
+which python
+which pip
+which torchrun
+
+# hard dump of what THIS process would import
+python - <<'PY'
+import sys, os, transformers
+from transformers import CONFIG_MAPPING
+print("== ENV DUMP ==")
+print("sys.executable:", sys.executable)
+print("transformers.__version__:", transformers.__version__)
+print("transformers.__file__:", transformers.__file__)
+print("has_qwen3:", 'qwen3' in CONFIG_MAPPING)
+print("sys.path[0:5]:", sys.path[:5])
+print("PYTHONPATH:", os.environ.get("PYTHONPATH"))
+print("================")
+PY
+#EDITED HERE
+
 # --- Info dump (handy for debugging) ---
 echo "Host: $(hostname)"
 nvidia-smi || true
