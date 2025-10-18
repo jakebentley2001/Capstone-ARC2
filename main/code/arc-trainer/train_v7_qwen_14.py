@@ -647,14 +647,17 @@ def download_model(model_name):
     start_time = time.time()
     
     # Download tokenizer first
-    tokenizer = AutoTokenizer.from_pretrained(model_name)
+    # EDITED HERE ****************************************************************************
+    tokenizer = AutoTokenizer.from_pretrained(model_name, trust_remote_code=True)
     logger.info(f"Downloaded tokenizer in {time.time() - start_time:.2f} seconds")
     
     # Then download model without loading it into memory
     try:
         # Just download the model files without loading the model
+        # EDITED HERE ****************************************************************************
         AutoModelForCausalLM.from_pretrained(
-            model_name, 
+            model_name,
+            trust_remote_code=True, 
             torch_dtype=torch.bfloat16 if torch.cuda.is_bf16_supported() else torch.float16,
             local_files_only=False
         )
@@ -701,8 +704,9 @@ def load_model_and_tokenizer(model_name):
     """Load model and tokenizer for 4-bit quantization"""
     logger.info(f"Loading model and tokenizer from {model_name}")
     start_time = time.time()
-    
-    tokenizer = AutoTokenizer.from_pretrained(model_name)
+
+    # EDITED HERE ****************************************************************************
+    tokenizer = AutoTokenizer.from_pretrained(model_name,trust_remote_code=True)
     
     if tokenizer.pad_token is None:
         logger.info("Tokenizer has no pad_token. Adding <pad>...")
@@ -719,8 +723,10 @@ def load_model_and_tokenizer(model_name):
     torch.cuda.set_device(local_rank)
     
     # Load the model with quantization config
+    # EDITED HERE ****************************************************************************
     model = AutoModelForCausalLM.from_pretrained(
         model_name,
+        trust_remote_code=True,
         quantization_config=quantization_config,
         torch_dtype=torch.bfloat16 if torch.cuda.is_bf16_supported() else torch.float16,
         device_map={"": local_rank},
@@ -764,14 +770,17 @@ def merge_lora_weights(base_model_path, adapter_path, output_path):
 
     
     # Load the base model and tokenizer
-    tokenizer = AutoTokenizer.from_pretrained(base_model_path)
+     # EDITED HERE ****************************************************************************
+    tokenizer = AutoTokenizer.from_pretrained(base_model_path,trust_remote_code=True)
 
     if tokenizer.pad_token is None:
         logger.info("Adapter tokenizer has no pad_token. Adding <pad> and resizing later...")
         tokenizer.add_special_tokens({"pad_token": "<pad>"})
-    
+
+    # EDITED HERE ****************************************************************************
     model = AutoModelForCausalLM.from_pretrained(
         base_model_path,
+        trust_remote_code=True,
         torch_dtype=torch.bfloat16 if torch.cuda.is_bf16_supported() else torch.float16
     ).to(device)
 
