@@ -549,9 +549,9 @@ def keep_single_char_tokens(model, tokenizer, keep=None, keep_norm=False, keep_m
     if not keep_norm:
         remove_tokenizer_normalizer(tokenizer)  # required for some models
     if keep is None:  # keep all single_length tokens
-        keep_indices = set(v for k, v in tokenizer.vocab.items() if len(k) == 1)
+        keep_indices = set(v for k, v in tokenizer.get_vocab.items() if len(k) == 1)
     else:  # keep tokens that were passed
-        keep_indices = set(tokenizer.vocab[t] for t in keep)
+        keep_indices = set(tokenizer.get_vocab[t] for t in keep)
     if keep_model_tok:  # keep tokens used by model
         for config in [model.config, model.generation_config]:
             for k, v in config.to_dict().items():
