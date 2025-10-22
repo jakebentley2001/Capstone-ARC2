@@ -30,11 +30,21 @@ class ArcDataset(object):
     def load_from_json(cls, challenges_file):  # for loading challenges in kaggle json arc dataset format
         with open(challenges_file) as f:
             challenge = f.read()
+        
+        data = {cls.base_key_replace_invalid_chars(k): v for k, v in data.items()}
+
         return cls(
             challenge=json.loads(challenge),
             is_fake=hashlib.md5(challenge.encode('utf-8')).hexdigest().lower() == 'a6b7dac3cab03abf2eb333e16610d6dc',
             is_orig=True,
         )
+    
+        
+    @staticmethod
+    def base_key_replace_invalid_chars(base_key):
+        return base_key.replace('_', '-').replace('.', '-')
+
+
 
     def load_solutions(self, solutions_file):  # for loading solutions in kaggle json arc dataset format
         with open(solutions_file) as f: solutions = f.read()
