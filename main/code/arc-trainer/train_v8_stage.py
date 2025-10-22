@@ -30,7 +30,8 @@ class ArcDataset(object):
     def load_from_json(cls, challenges_file):  # for loading challenges in kaggle json arc dataset format
         with open(challenges_file) as f:
             challenge = f.read()
-        
+
+        data = json.loads(challenge)
         data = {cls.base_key_replace_invalid_chars(k): v for k, v in data.items()}
 
         return cls(
