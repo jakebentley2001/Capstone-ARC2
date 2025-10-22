@@ -632,7 +632,7 @@ arc_heavy_path = os.path.join(base_path, 'ARC-Heavy')  # https://github.com/neon
 
 # output paths
 base_model_path = "/ocean/projects/cis250063p/jbentley/ARC-AGI-2/Capstone-ARC2/shared/arc/outputs/models"
-save_model_path = os.path.join(base_model_path, "Mistral-Minitron-8B-Nemo-Mix-Train")
+save_model_path = os.path.join(base_model_path, "Mistral-Minitron-8B-Stage-0")
 
 import torch.distributed as dist
 rank = int(os.environ.get("RANK", -1))

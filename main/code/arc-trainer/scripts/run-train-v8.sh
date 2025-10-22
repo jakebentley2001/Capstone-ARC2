@@ -1,12 +1,12 @@
 #!/bin/bash
-#SBATCH --job-name=mistral
+#SBATCH --job-name=llama-3
 #SBATCH --partition=GPU-shared
 #SBATCH --account=cis250063p
 #SBATCH --nodes=1
 #SBATCH --ntasks=1
-#SBATCH --gres=gpu:h100-80:2
+#SBATCH --gres=gpu:h100-80:4
 #SBATCH --cpus-per-task=8
-#SBATCH --mem=32G
+#SBATCH --mem=96G
 #SBATCH --time=12:00:00
 #SBATCH --output=/ocean/projects/cis250063p/jbentley/ARC-AGI-2/Capstone-ARC2/shared/arc/outputs/logs/%x_%j.out
 #SBATCH --error=/ocean/projects/cis250063p/jbentley/ARC-AGI-2/Capstone-ARC2/shared/arc/outputs/logs/%x_%j.err
@@ -51,8 +51,8 @@ PY
 # --- Launch training with DDP (ranks = GPUs on node) ---
 MASTER_PORT=${MASTER_PORT:-29501}
 
-echo "Launching torchrun with 2 ranks on $(hostname)"
+echo "Launching torchrun with 4 ranks on $(hostname)"
 torchrun \
-  --nproc_per_node=2 \
+  --nproc_per_node=4 \
   --master_port="${MASTER_PORT}" \
   main/code/arc-trainer/train_v8_stage.py
