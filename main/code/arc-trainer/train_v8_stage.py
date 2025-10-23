@@ -302,6 +302,12 @@ class ArcDataset(object):
                 base_key = self.get_base_key(key)
                 print(f"Skipping task after trim emptied ex-list: {base_key}")
                 return None, None
+
+            # NEW: if trimming produced an empty string (e.g., from 'ex0'), skip
+            if key_split[-1] == '':
+                base_key = self.get_base_key(key)
+                print(f"Skipping task after trim removed the only index: {base_key}")
+                return None, None
             assert len(key_split[-1]) > 2 and key_split[-1].startswith('ex')
             key = '.'.join(key_split)
         return key, fmt
