@@ -1000,13 +1000,29 @@ def main():
                 #     for k in train_dataset_augment.keys:
                 #         _, fmt = train_dataset_augment.get_task(k, len_name="text", **fmt_opts)
                 #         yield {"text": fmt["text"]}
+                # def build_stream_of_texts():
+                #     for k in train_dataset_augment.keys:
+                #         new_key, fmt = train_dataset_augment.get_task(k, len_name="text", **fmt_opts)
+                #         if new_key is None:
+                #             # skipped: single-train or ex would be empty
+                #             continue
+                #         yield {"text": fmt["text"]}
                 def build_stream_of_texts():
                     for k in train_dataset_augment.keys:
-                        new_key, fmt = train_dataset_augment.get_task(k, len_name="text", **fmt_opts)
-                        if new_key is None:
-                            # skipped: single-train or ex would be empty
+                        try:
+                            new_key, fmt = train_dataset_augment.get_task(k, len_name="text", **fmt_opts)
+                            if new_key is None:
+                                continue  # skipped: single-train or ex-list emptied
+                            text = fmt.get("text") if isinstance(fmt, dict) else None
+                            if not isinstance(text, str) or not text:
+                                print(f"[SKIP:bad-text] key={k} base={train_dataset_augment.get_base_key(k)}")
+                                continue
+                            yield {"text": text}
+                        except Exception as e:
+                            # Surface the *actual* root cause & the key that triggered it
+                            print(f"[GEN ERROR] key={k} base={train_dataset_augment.get_base_key(k)} err={repr(e)}")
+                            # Skip this one and keep streaming
                             continue
-                        yield {"text": fmt["text"]}
 
                 logger.info("Building Stream")
                 raw = datasets.Dataset.from_generator(build_stream_of_texts)
