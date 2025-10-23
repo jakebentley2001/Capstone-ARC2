@@ -252,6 +252,20 @@ class ArcDataset(object):
         ret['text'] = ret['train'] + (ret['query'] + ret['reply'] if reply is not None else '')
         return ret
 
+    # def get_task(self, key, max_tokens=None, len_name=None, **kwargs):
+    #     while True:
+    #         fmt = self.fmt_task(key, **kwargs)
+    #         if max_tokens is None or self.count_tokens(fmt[len_name]) <= max_tokens:
+    #             break
+    #         if not key.split('.')[-1].startswith('ex'):
+    #             base_key = self.get_base_key(key)
+    #             key = f"{key}.ex{'-'.join(map(str, range(len(self.challenge[base_key]['train']))))}"
+    #         key_split = key.split('.')
+    #         key_split[-1] = '-'.join(key_split[-1].split('-')[:-1])
+    #         assert len(key_split[-1]) > 2 and key_split[-1].startswith('ex')
+    #         key = '.'.join(key_split)
+    #     return key, fmt
+
     def get_task(self, key, max_tokens=None, len_name=None, **kwargs):
         while True:
             fmt = self.fmt_task(key, **kwargs)
@@ -259,12 +273,18 @@ class ArcDataset(object):
                 break
             if not key.split('.')[-1].startswith('ex'):
                 base_key = self.get_base_key(key)
+                # Skip if only one training example
+                if len(self.challenge[base_key]['train']) <= 1:
+                    print(f"Skipping task with only one example: {base_key}")
+                    return None, None
                 key = f"{key}.ex{'-'.join(map(str, range(len(self.challenge[base_key]['train']))))}"
             key_split = key.split('.')
             key_split[-1] = '-'.join(key_split[-1].split('-')[:-1])
             assert len(key_split[-1]) > 2 and key_split[-1].startswith('ex')
             key = '.'.join(key_split)
         return key, fmt
+
+
 
     def repeat(self, n, seed=None):
         if seed is not None:
@@ -947,9 +967,16 @@ def main():
                 )
 
                 # 4) Stream out text samples one-by-one (no giant lists)
+                # def build_stream_of_texts():
+                #     for k in train_dataset_augment.keys:
+                #         _, fmt = train_dataset_augment.get_task(k, len_name="text", **fmt_opts)
+                #         yield {"text": fmt["text"]}
                 def build_stream_of_texts():
                     for k in train_dataset_augment.keys:
-                        _, fmt = train_dataset_augment.get_task(k, len_name="text", **fmt_opts)
+                        new_key, fmt = train_dataset_augment.get_task(k, len_name="text", **fmt_opts)
+                        if new_key is None:
+                            # skipped: single-train or ex would be empty
+                            continue
                         yield {"text": fmt["text"]}
 
                 logger.info("Building Stream")
