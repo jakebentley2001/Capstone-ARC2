@@ -266,6 +266,24 @@ class ArcDataset(object):
     #         key = '.'.join(key_split)
     #     return key, fmt
 
+    # def get_task(self, key, max_tokens=None, len_name=None, **kwargs):
+    #     while True:
+    #         fmt = self.fmt_task(key, **kwargs)
+    #         if max_tokens is None or self.count_tokens(fmt[len_name]) <= max_tokens:
+    #             break
+    #         if not key.split('.')[-1].startswith('ex'):
+    #             base_key = self.get_base_key(key)
+    #             # Skip if only one training example
+    #             if len(self.challenge[base_key]['train']) <= 1:
+    #                 print(f"Skipping task with only one example: {base_key}")
+    #                 return None, None
+    #             key = f"{key}.ex{'-'.join(map(str, range(len(self.challenge[base_key]['train']))))}"
+    #         key_split = key.split('.')
+    #         key_split[-1] = '-'.join(key_split[-1].split('-')[:-1])
+    #         assert len(key_split[-1]) > 2 and key_split[-1].startswith('ex')
+    #         key = '.'.join(key_split)
+    #     return key, fmt
+
     def get_task(self, key, max_tokens=None, len_name=None, **kwargs):
         while True:
             fmt = self.fmt_task(key, **kwargs)
@@ -273,16 +291,21 @@ class ArcDataset(object):
                 break
             if not key.split('.')[-1].startswith('ex'):
                 base_key = self.get_base_key(key)
-                # Skip if only one training example
                 if len(self.challenge[base_key]['train']) <= 1:
                     print(f"Skipping task with only one example: {base_key}")
                     return None, None
                 key = f"{key}.ex{'-'.join(map(str, range(len(self.challenge[base_key]['train']))))}"
             key_split = key.split('.')
             key_split[-1] = '-'.join(key_split[-1].split('-')[:-1])
+            # NEW: if ex-list became empty (just "ex"), print & skip instead of asserting
+            if key_split[-1] == 'ex':
+                base_key = self.get_base_key(key)
+                print(f"Skipping task after trim emptied ex-list: {base_key}")
+                return None, None
             assert len(key_split[-1]) > 2 and key_split[-1].startswith('ex')
             key = '.'.join(key_split)
         return key, fmt
+
 
 
 
