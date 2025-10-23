@@ -35,7 +35,7 @@ class ArcDataset(object):
         data = {cls.base_key_replace_invalid_chars(k): v for k, v in data.items()}
 
         return cls(
-            challenge=json.loads(challenge),
+            challenge=data,
             is_fake=hashlib.md5(challenge.encode('utf-8')).hexdigest().lower() == 'a6b7dac3cab03abf2eb333e16610d6dc',
             is_orig=True,
         )
