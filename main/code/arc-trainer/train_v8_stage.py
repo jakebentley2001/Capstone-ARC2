@@ -48,10 +48,20 @@ class ArcDataset(object):
 
 
     def load_solutions(self, solutions_file):  # for loading solutions in kaggle json arc dataset format
-        with open(solutions_file) as f: solutions = f.read()
-        data = json.loads(solutions)
-        solutions = {k: data[k] for k in self.challenge}
+        with open(solutions_file) as f:
+            raw = json.load(f)
+        data = {self.base_key_replace_invalid_chars(k): v for k, v in raw.items()}
+        # Keep only solutions that correspond to our sanitized challenge keys
+        solutions = {k: data[k] for k in self.challenge if k in data}
+        # Optional: detect any missing keys early
+        missing = [k for k in self.challenge if k not in data]
+        if missing:
+            raise KeyError(f"Missing {len(missing)} solution keys (first few): {missing[:5]}")
         return self.__class__(keys=self.keys, challenge=self.challenge, solutions=solutions, is_orig=self.is_orig)
+        # with open(solutions_file) as f: solutions = f.read()
+        # data = json.loads(solutions)
+        # solutions = {k: data[k] for k in self.challenge}
+        # return self.__class__(keys=self.keys, challenge=self.challenge, solutions=solutions, is_orig=self.is_orig)
 
     # loader for Michael Hodel's ReArc https://github.com/neoneye/arc-dataset-collection
     @classmethod
