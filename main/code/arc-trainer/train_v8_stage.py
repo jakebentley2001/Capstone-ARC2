@@ -934,8 +934,8 @@ def main():
                 # 2) Build Re-ARC + mix
                 train_dataset = ArcDataset.load_from_rearc(
                     re_arc_path,
-                    n=368,
-                    sizes=[6],
+                    n=199,
+                    sizes=[4],
                     seed=42,
                     mix_datasets=mix_datasets,
                 )
