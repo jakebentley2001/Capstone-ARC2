@@ -632,7 +632,7 @@ neoneye_path = os.path.join(base_path, 'arc-dataset-collection')  # https://gith
 
 # output paths
 base_model_path = "/ocean/projects/cis250063p/jbentley/ARC-AGI-2/Capstone-ARC2/shared/arc/outputs/models"
-save_model_path = os.path.join(base_model_path, "Mistral-Minitron-8B-Nemo-Mix-Train")
+save_model_path = os.path.join(base_model_path, "Mistral-Minitron-8B-Nemo-Mix-Train-Trial")
 
 import torch.distributed as dist
 rank = int(os.environ.get("RANK", -1))
@@ -894,7 +894,7 @@ def main():
                 arc_eval_set = ArcDataset.load_from_json(os.path.join(arc_data_path, 'arc-agi_evaluation_challenges.json'))
                 arc_eval_set = arc_eval_set.load_solutions(os.path.join(arc_data_path, 'arc-agi_evaluation_solutions.json'))
                 concept_arc = ArcDataset.load_from_neoneye(os.path.join(neoneye_path, "dataset", "ConceptARC"))
-                
+                  
                 mix_datasets = {
                     "arceval": arc_eval_set.move_test_to_train().repeat(64),
                     "concept": concept_arc.move_test_to_train().repeat(64),
