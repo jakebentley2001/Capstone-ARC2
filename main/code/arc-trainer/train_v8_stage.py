@@ -453,17 +453,37 @@ class InputMaskingDataCollator(DataCollatorForCompletionOnlyLM):
         super().__init__(**kwargs)
         self.mask_first_n_examples = mask_first_n_examples
 
+    # def torch_call(self, examples):
+    #     batch = super().torch_call(examples)  # call super, masking all inputs
+    #     for i in range(len(batch['labels'])):
+    #         for _ in range(self.mask_first_n_examples):
+    #             # mask first still unmasked output block
+    #             beg_pos = ((batch['labels'][i] != -100).nonzero().min()).item()
+    #             mid_pos = ((batch['labels'][i][beg_pos:] == -100).nonzero().min()).item() + beg_pos
+    #             end_pos = ((batch['labels'][i] != -100).nonzero().max()).item() + 1
+    #             if mid_pos < end_pos:
+    #                 batch['labels'][i][beg_pos:mid_pos] = -100
+    #     return batch
     def torch_call(self, examples):
-        batch = super().torch_call(examples)  # call super, masking all inputs
+        batch = super().torch_call(examples)  # masks everything except responses
         for i in range(len(batch['labels'])):
             for _ in range(self.mask_first_n_examples):
-                # mask first still unmasked output block
-                beg_pos = ((batch['labels'][i] != -100).nonzero().min()).item()
-                mid_pos = ((batch['labels'][i][beg_pos:] == -100).nonzero().min()).item() + beg_pos
-                end_pos = ((batch['labels'][i] != -100).nonzero().max()).item() + 1
-                if mid_pos < end_pos:
-                    batch['labels'][i][beg_pos:mid_pos] = -100
+                # find first unmasked label
+                nz = (batch['labels'][i] != -100).nonzero(as_tuple=False).squeeze(-1)
+                if nz.numel() == 0:
+                    break  # nothing left to mask
+
+                beg_pos = nz.min().item()
+                end_pos = nz.max().item() + 1
+
+                # find first -100 after beg_pos (i.e., end of this response span)
+                sep = (batch['labels'][i][beg_pos:end_pos] == -100).nonzero(as_tuple=False).squeeze(-1)
+                mid_pos = (sep.min().item() + beg_pos) if sep.numel() > 0 else end_pos
+
+                # mask that first span
+                batch['labels'][i][beg_pos:mid_pos] = -100
         return batch
+
 
 
 def load_unsloth_4bit(model_path):
