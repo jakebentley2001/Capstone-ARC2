@@ -958,7 +958,11 @@ def main():
                     load_from_cache_file=False,
                 )
 
-            if rank in (-1, 0):
+            #if rank in (-1, 0):
+            # added this
+            done_flag = disk_ds_dir + ".done"
+
+            if rank == 0:
                 # ------- Build EVERYTHING only on rank 0 -------
                 # 1) Load ConceptARC and make the mix
                 # arc_eval_set = ArcDataset.load_from_json(os.path.join(arc_data_path, 'arc-agi_evaluation_challenges.json'))
@@ -1041,9 +1045,17 @@ def main():
                     shutil.rmtree(disk_ds_dir)
                 os.replace(tmp_dir, disk_ds_dir)
 
-            # ------- All ranks: wait until dataset exists, then memory-map and shard -------
-            while not os.path.exists(disk_ds_dir):
+                # added this
+                with open(done_flag, "w") as _:
+                    pass
+
+            #added this
+            while not os.path.exists(done_flag):
                 time.sleep(1)
+            # ------- All ranks: wait until dataset exists, then memory-map and shard -------
+
+            # while not os.path.exists(disk_ds_dir):
+            #     time.sleep(1)
 
             logger.info("Loading to all ")
             tokenized_dataset = datasets.load_from_disk(disk_ds_dir)
