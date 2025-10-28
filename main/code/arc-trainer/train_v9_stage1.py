@@ -738,51 +738,109 @@ def download_model(model_name):
     # Load tokenizer locally to verify the folder has tokenizer files
     return AutoTokenizer.from_pretrained(model_name, local_files_only=True)
 
-
 def load_model_and_tokenizer(model_name_or_path):
-    """Load model+tokenizer (local path or HF repo) with 4-bit quantization."""
+    """Load model+tokenizer (local path or HF repo) with 4-bit quantization, DDP-safe."""
     logger.info(f"Loading model and tokenizer from {model_name_or_path}")
     start_time = time.time()
 
-    # Prefer local files; if it's a HF id, it will still work.
+    is_local = os.path.isdir(model_name_or_path)
+
+    # --- Rank & device setup (DDP-safe) ---
+    local_rank = int(os.environ.get("LOCAL_RANK", "0"))
+    if torch.cuda.is_available():
+        torch.cuda.set_device(local_rank)
+
+    # --- Tokenizer (identical on all ranks) ---
     tokenizer = AutoTokenizer.from_pretrained(
         model_name_or_path,
-        local_files_only=os.path.isdir(model_name_or_path)
+        local_files_only=is_local,
     )
 
-    # If we add a pad token, we must resize embeddings later (we do that after loading model).
     added_pad = False
     if tokenizer.pad_token is None:
         logger.info("Tokenizer has no pad_token. Adding <pad>…")
         tokenizer.add_special_tokens({"pad_token": "<pad>"})
         added_pad = True
 
+    # --- 4-bit quantization config ---
     quantization_config = BitsAndBytesConfig(
         load_in_4bit=True,
         bnb_4bit_quant_type="nf4",
         bnb_4bit_compute_dtype=torch.bfloat16 if torch.cuda.is_bf16_supported() else torch.float16,
-        bnb_4bit_use_double_quant=True
+        bnb_4bit_use_double_quant=True,
     )
 
-    local_rank = int(os.environ.get("LOCAL_RANK", 0))
-    if torch.cuda.is_available():
-        torch.cuda.set_device(local_rank)
-
+    # --- Model load (no device_map under DDP) ---
     model = AutoModelForCausalLM.from_pretrained(
         model_name_or_path,
         quantization_config=quantization_config,
         torch_dtype=torch.bfloat16 if torch.cuda.is_bf16_supported() else torch.float16,
-        device_map={"": local_rank},
-        local_files_only=os.path.isdir(model_name_or_path)
+        local_files_only=is_local,
     )
+    if torch.cuda.is_available():
+        model.to(f"cuda:{local_rank}")
 
-    # If we added a pad token, resize the embeddings to avoid shape mismatches.
+    # --- Keep tokenizer/model in sync across ranks ---
     if added_pad:
         model.resize_token_embeddings(len(tokenizer))
 
     model = prepare_model_for_kbit_training(model)
+
+    # --- Optional: barrier to align ranks before DDP wrap ---
+    try:
+        import torch.distributed as dist
+        if dist.is_available() and dist.is_initialized():
+            dist.barrier()
+    except Exception:
+        pass
+
     logger.info(f"Model loaded in {time.time() - start_time:.2f} seconds")
     return model, tokenizer
+
+# def load_model_and_tokenizer(model_name_or_path):
+#     """Load model+tokenizer (local path or HF repo) with 4-bit quantization."""
+#     logger.info(f"Loading model and tokenizer from {model_name_or_path}")
+#     start_time = time.time()
+
+#     # Prefer local files; if it's a HF id, it will still work.
+#     tokenizer = AutoTokenizer.from_pretrained(
+#         model_name_or_path,
+#         local_files_only=os.path.isdir(model_name_or_path)
+#     )
+
+#     # If we add a pad token, we must resize embeddings later (we do that after loading model).
+#     added_pad = False
+#     if tokenizer.pad_token is None:
+#         logger.info("Tokenizer has no pad_token. Adding <pad>…")
+#         tokenizer.add_special_tokens({"pad_token": "<pad>"})
+#         added_pad = True
+
+#     quantization_config = BitsAndBytesConfig(
+#         load_in_4bit=True,
+#         bnb_4bit_quant_type="nf4",
+#         bnb_4bit_compute_dtype=torch.bfloat16 if torch.cuda.is_bf16_supported() else torch.float16,
+#         bnb_4bit_use_double_quant=True
+#     )
+
+#     local_rank = int(os.environ.get("LOCAL_RANK", 0))
+#     if torch.cuda.is_available():
+#         torch.cuda.set_device(local_rank)
+
+#     model = AutoModelForCausalLM.from_pretrained(
+#         model_name_or_path,
+#         quantization_config=quantization_config,
+#         torch_dtype=torch.bfloat16 if torch.cuda.is_bf16_supported() else torch.float16,
+#         device_map={"": local_rank},
+#         local_files_only=os.path.isdir(model_name_or_path)
+#     )
+
+#     # If we added a pad token, resize the embeddings to avoid shape mismatches.
+#     if added_pad:
+#         model.resize_token_embeddings(len(tokenizer))
+
+#     model = prepare_model_for_kbit_training(model)
+#     logger.info(f"Model loaded in {time.time() - start_time:.2f} seconds")
+#     return model, tokenizer
 
 
 def _get_local_rank():
