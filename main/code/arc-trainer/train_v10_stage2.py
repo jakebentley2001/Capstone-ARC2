@@ -1126,7 +1126,7 @@ def main():
                 per_device_train_batch_size=1,  # Increased to match DeepSpeed config
                 gradient_accumulation_steps=8,  # No need for gradient accumulation
                 warmup_ratio=0.25,
-                learning_rate=5e-5,
+                learning_rate=3e-5,
                 #embedding_learning_rate=1e-5,
                 weight_decay=0.00,
                 fp16=not torch.cuda.is_bf16_supported(),
